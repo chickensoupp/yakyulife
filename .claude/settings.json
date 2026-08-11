@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(where node *)",
+      "Bash(where.exe node *)",
+      "Read(//c/Program Files/**)",
+      "PowerShell(Get-Command node -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

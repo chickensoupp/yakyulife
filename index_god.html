@@ -432,8 +432,8 @@ function tjGamble(cont){ /* 量表達上限:先扣 -5,再對賭 */
       else { tjBigInjury(cont); } }}]);
 }
 function tjTwoStrike(){ /* 累計 2 次 TJ:球速與變化球砍半 */
-  S.ab.vel=clamp(Math.round(S.ab.vel/2),1,80);
-  S.ab.brk=clamp(Math.round(S.ab.brk/2),1,80);
+  S.ab.vel=clamp(Math.round(S.ab.vel/2),1,150);
+  S.ab.brk=clamp(Math.round(S.ab.brk/2),1,150);
   card('bad','兩度動刀的代價','第二次進手術室——韌帶再也不是原廠的了。球速與變化球<b class="dn">直接砍半</b>。');
 }
 function tjBigInjury(cont){
@@ -508,22 +508,11 @@ function playerType(){
   return cand[0][0];
 }
 function abCost(k){ /* 目前這一級要花幾點(須與 addAb 成本公式一致) */
-  const cur=S.ab[k], pk=(S.pot&&S.pot[k])||62, isP=S.pos==='P';
-  let c=isP?(cur>=66?7:cur>=58?4:cur>=50?2:1):(cur>=72?3:cur>=64?2:1);
-  if(cur>=pk)c*=isP?4:3; return c;
+  return 1;
 }
 function addAb(k,v){ if(!(k in S.ab))return 0; const o=S.ab[k];
-  if(v<0){ S.ab[k]=clamp(o+v,1,80); return S.ab[k]-o; } /* 扣值 1:1,不吃量表成本 */
-  if(!S.carry)S.carry={};
-  let cur=o,bud=v+(S.carry[k]||0); /* 未滿一級的點數累積在進度槽,不再蒸發 */
-  const pk=(S&&S.pot&&S.pot[k])||62;
-  const isP=S&&S.pos==='P';
-  while(bud>0&&cur<80){
-    let cost=isP?(cur>=66?7:cur>=58?4:cur>=50?2:1)      /* 投手只有4項,養成成本最陡 */
-              :(cur>=72?3:cur>=64?2:1);                    /* 野手9項,中高段變貴 */
-    if(cur>=pk)cost*=isP?4:3; /* 天花板之上:投手×4、野手×3 */
-    if(bud>=cost){bud-=cost;cur++;} else break; }
-  S.carry[k]=cur>=80?0:bud;
+  if(v<0){ S.ab[k]=clamp(o+v,1,150); return S.ab[k]-o; } /* 扣值 1:1,不吃量表成本 */
+  const cur=Math.min(o+v,150);
   S.ab[k]=cur; return cur-o; }
 function injuryProb(){ /* 基礎風險從 24 降為 15，減少動不動就受傷的頻率 */
   let p=15+S.injNext;
@@ -712,23 +701,22 @@ function allocUI(mode,label,done){
     if(dice){ top.innerHTML='<div id="dice">'+dice.map((v,i)=>`<div class="die ${i<idx?'used':''} ${i===idx?'active':''} ${v===6?'six':''}">${v}</div>`).join('')+'</div>'; }
     else top.innerHTML=`<div class="pool">剩餘可分配點數：${pool} 點（點一下能力 +1）</div>`;
     rows.innerHTML='';
-    keys.forEach(k=>{ const v=S.ab[k],cap=v>=80;
+    keys.forEach(k=>{ const v=S.ab[k],cap=v>=150;
       const r=document.createElement('div'); r.className='abrow'+(cap?' capped':'');
-      const pk=(S.pot&&S.pot[k])||62, cst=abCost(k), cr=(S.carry&&S.carry[k])||0;
-      r.innerHTML=`<span class="nm">${ABL[k]}</span><span class="bar"><i style="width:${v/80*100}%"></i><em style="left:${pk/80*100}%"></em></span><span class="val" style="line-height:1.1">${v}<small style="opacity:.5">/${pk}</small>${cst>1?`<span style="display:block;opacity:.5;font-size:10.5px;letter-spacing:1px;margin-top:-2px">${cr}/${cst}</span>`:''}</span>`;
+      const pk=(S.pot&&S.pot[k])||62;
+      r.innerHTML=`<span class="nm">${ABL[k]}</span><span class="bar"><i style="width:${v/150*100}%"></i><em style="left:${pk/150*100}%"></em></span><span class="val" style="line-height:1.1">${v}<small style="opacity:.5">/${pk}</small></span>`;
       if(!cap&&remaining()>0)r.onclick=()=>{ const amt=dice?dice[idx]:1;
-        const pc=(S.carry&&S.carry[k])||0;
-        const got=addAb(k,amt); touchedKeys[k]=(touchedKeys[k]||0)+amt; hist.push([k,got,pc]); if(dice)idx++; else pool--;
-        r.querySelector('.val').innerHTML=`${S.ab[k]} <b style="display:block;font-size:10.5px">${got>0?'+'+got:'蓄力中'}</b>`; render(); board(0); };
+        const got=addAb(k,amt); touchedKeys[k]=(touchedKeys[k]||0)+amt; hist.push([k,got]); if(dice)idx++; else pool--;
+        r.querySelector('.val').innerHTML=`${S.ab[k]} <b style="display:block;font-size:10.5px">+${got}</b>`; render(); board(0); };
       rows.appendChild(r); });
     btm.innerHTML='';
     /* 復原鈕固定佔位:無可復原時 disabled 而非消失,避免版面跳動誤觸 */
     const u=document.createElement('button'); u.className='btn'; u.style.textAlign='center';
     u.textContent='↩ 復原'; u.disabled=!hist.length;
     u.style.opacity=hist.length?'1':'0.35'; u.style.cursor=hist.length?'pointer':'default';
-    if(hist.length)u.onclick=()=>{ const [k,got,pc]=hist.pop(); S.ab[k]-=got; if(S.carry)S.carry[k]=pc; if(dice)idx--; else pool++; render(); board(0); };
+    if(hist.length)u.onclick=()=>{ const [k,got]=hist.pop(); S.ab[k]-=got; if(dice)idx--; else pool++; render(); board(0); };
     btm.appendChild(u);
-    const allCap=keys.every(k=>S.ab[k]>=80);
+    const allCap=keys.every(k=>S.ab[k]>=150);
     if(remaining()===0||allCap){ const c=document.createElement('button'); c.className='btn main';
       c.textContent=(remaining()>0&&allCap)?'能力已達上限，捨棄剩餘骰子 ▸':'確認 ▸';
       c.onclick=()=>{ actClear(); allocDone(touchedKeys,dice?true:false); done(); }; btm.appendChild(c); }
@@ -751,7 +739,7 @@ function phasePre(){
   if(S.age>=48){ endGame('身體已到極限，'+S.year+' 年春訓後宣布引退。'); return; }
   const declAge=S.age-(S.traits.disc?2:0); /* 自律狂:衰退曲線整體延後兩年 */
   if(declAge>=32){ const dec=declAge>=35?5+(declAge-35):2;
-    POS_AB[S.pos].forEach(k=>S.ab[k]=clamp(S.ab[k]-dec,1,80));
+    POS_AB[S.pos].forEach(k=>S.ab[k]=clamp(S.ab[k]-dec,1,150));
     card('bad','歲月不饒人',`${declAge>=35?'第二階段（逐年加劇）':'第一階段'}衰退：所有能力 <b class="dn">−${dec}</b>${S.traits.disc?'（自律狂：生涯延後兩年）':''}。訓練加點照常，但身體回不去了。`); board(0); }
   if(S.rehab>0){ S.rehab--; S.skipMid=true; S.seasonFactor=0;
     card('bad','復健年',`大傷尚未痊癒，本季確定<b class="dn">全年報銷</b>，只能在復健室度過。（擲骰減為 2 顆）`);
@@ -772,8 +760,8 @@ function phasePre(){
       const cands=POS_AB[S.pos].filter(k=>S.ab[k]<70&&!exDef.includes(k));
       for(let i=cands.length-1;i>0;i--){const j=Math.floor(R()*(i+1));const t=cands[i];cands[i]=cands[j];cands[j]=t;}
       const boost=cands.slice(0,2), bl=[];
-      boost.forEach(k=>{ S.pot[k]=Math.min(80,(S.pot[k]||62)+10);
-        S.ab[k]=clamp(S.ab[k]+5,1,80); bl.push(`${ABL[k]} <b class="up">+5</b>（潛力上限 +10 → ${S.pot[k]}）`); });
+      boost.forEach(k=>{ S.pot[k]=Math.min(150,(S.pot[k]||62)+10);
+        S.ab[k]=clamp(S.ab[k]+5,1,150); bl.push(`${ABL[k]} <b class="up">+5</b>（潛力上限 +10 → ${S.pot[k]}）`); });
       card('gold','隱藏素質解鎖：天才','22 歲前五度擲出高標值！從今以後，每一顆訓練骰<b class="hl">永久固定 4 點以上</b>，事件卡好結果機率提升至 <b class="hl">70%</b>。'+(bl.length?`天賦覺醒，潛能重新被評估：${bl.join('、')}。`:'')+'天賦，是藏不住的。');
       board(1);
     } }
@@ -922,7 +910,7 @@ function loveCaught(next){
   if(L.caught>=2){
     if(!S.traits.scum){ S.traits.scum=true;
       card('bad','隱藏屬性解鎖：渣男','第二次被逮個正著。從今以後你在球迷心中的形象定型了——<b class="dn">每次外遇被抓到，全能力 −5</b>。'); }
-    POS_AB[S.pos].forEach(k=>{ S.ab[k]=clamp(S.ab[k]-5,1,80); });
+    POS_AB[S.pos].forEach(k=>{ S.ab[k]=clamp(S.ab[k]-5,1,150); });
     extra='<b class="dn">全能力 −5</b>（渣男的代價）。'; }
   board(1);
   card('bad','頭版醜聞',`狗仔的鏡頭比你想的更快，照片鋪滿版面。贊助商緊急撤圖，你在鏡頭前鞠躬 90 度。<b class="dn">${ABL[kk]} ${g}</b>。${extra}`);
@@ -954,7 +942,7 @@ function loveCaughtDating(next){
   if(L.caught>=2){
     if(!S.traits.scum){ S.traits.scum=true;
       card('bad','隱藏屬性解鎖：渣男','第二次被逮個正著。從今以後你在球迷心中的形象定型了——<b class="dn">每次劈腿/外遇被抓到，全能力 −5</b>。'); }
-    POS_AB[S.pos].forEach(k=>{ S.ab[k]=clamp(S.ab[k]-5,1,80); });
+    POS_AB[S.pos].forEach(k=>{ S.ab[k]=clamp(S.ab[k]-5,1,150); });
     extra='<b class="dn">全能力 −5</b>（渣男的代價）。'; }
   board(1);
   card('bad','劈腿曝光',`行車紀錄器畫面流出，時間軸對得整整齊齊。<b class="dn">${ABL[kk]} ${g}</b>。${extra}`);
@@ -1035,7 +1023,7 @@ function allocDone(touched,isDice){
     const cands=POS_AB[S.pos].filter(k=>S.ab[k]<70&&!exDef.includes(k));
     for(let i=cands.length-1;i>0;i--){const j=Math.floor(R()*(i+1));const t=cands[i];cands[i]=cands[j];cands[j]=t;}
     const boost=cands.slice(0,2), bl=[];
-    boost.forEach(k=>{ S.pot[k]=Math.min(80,(S.pot[k]||62)+10); S.ab[k]=clamp(S.ab[k]+5,1,80);
+    boost.forEach(k=>{ S.pot[k]=Math.min(150,(S.pot[k]||62)+10); S.ab[k]=clamp(S.ab[k]+5,1,150);
       bl.push(`${ABL[k]} <b class="up">+5</b>（潛力上限 +10 → ${S.pot[k]}）`); });
     card('gold','隱藏素質解鎖：大器晚成',`別人都以為你到頂了，你卻在這一年脫胎換骨——從今以後，每一顆訓練骰<b class="hl">永久固定 3 點以上</b>，事件卡好結果機率提升至 <b class="hl">70%</b>。`+(bl.length?`潛能重新被評估：${bl.join('、')}。`:'')+'你的故事，才正要展開。');
     board(1); }
@@ -1153,14 +1141,14 @@ function rollInjury(){
 }
 function injStatLoss(big){
   if(big){ /* 每一次大傷:全能力 −5,身體被實質性摧毀 */
-    POS_AB[S.pos].forEach(k=>{ S.ab[k]=clamp(S.ab[k]-5,1,80); }); board(1);
+    POS_AB[S.pos].forEach(k=>{ S.ab[k]=clamp(S.ab[k]-5,1,150); }); board(1);
     return `重大傷勢重創身體素質：<b class="dn">全能力 −5</b>。`;
   }
   if(!chance(40))return '';
   const keys=POS_AB[S.pos];
   let k=pick(keys); if(!(k in S.ab))k=pick(keys);
   const amt=ri(1,2);
-  S.ab[k]=clamp(S.ab[k]-amt,1,80); board(1);
+  S.ab[k]=clamp(S.ab[k]-amt,1,150); board(1);
   return `傷勢留下後遺症：<b class="dn">${ABL[k]} −${amt}</b>。`;
 }
 function amateurSeason(){
