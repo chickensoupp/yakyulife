@@ -196,7 +196,8 @@ table.fin td:first-child,table.fin th:first-child{text-align:left}
 </div>
 <script>
 /* ================= RNG（種子化） ================= */
-let SEED = new URLSearchParams(location.search).get('seed') || Math.random().toString(36).slice(2,10);
+const URL_SEED = new URLSearchParams(location.search).get('seed');
+let SEED = URL_SEED || Math.random().toString(36).slice(2,10);
 let _s = 0;
 function seedInit(str){ _s = 1779033703; for(let i=0;i<str.length;i++){ _s = Math.imul(_s ^ str.charCodeAt(i), 3432918353); _s = _s<<13 | _s>>>19; } }
 function R(){ _s|=0; _s = _s + 0x6D2B79F5 |0; let t = Math.imul(_s ^ _s>>>15, 1|_s); t = t + Math.imul(t ^ t>>>7, 61|t) ^ t; return ((t ^ t>>>14)>>>0)/4294967296; }
@@ -2298,11 +2299,24 @@ function shareImage(evals,out){
     catch(e){ alert('代碼格式不對，請確認是完整複製的 CHR1. 開頭代碼。'); } };
 })();
 let selPos='P';
+const MIN_OVR=32;
+function seedOvr(str,pos){ /* 用候選種子碼模擬新生角色的綜合值,不影響現有狀態 */
+  seedInit(str); const bak=S; S=newState('_',pos,null);
+  const v=ovr(); S=bak; return v;
+}
+function genSeed(pos){ /* 只回傳綜合超過門檻的種子碼 */
+  let s; do{ s=Math.random().toString(36).slice(2,10); }while(seedOvr(s,pos)<=MIN_OVR);
+  return s;
+}
+let autoSeed=!URL_SEED; /* 種子碼是否為系統自動產生(而非玩家手動輸入) */
+if(autoSeed){ SEED=genSeed(selPos); }
 $('seed-show').value=SEED;
-$('seed-re').onclick=e=>{e.preventDefault();SEED=Math.random().toString(36).slice(2,10);$('seed-show').value=SEED;};
+$('seed-show').addEventListener('input',()=>{ autoSeed=false; });
+$('seed-re').onclick=e=>{e.preventDefault(); autoSeed=true; SEED=genSeed(selPos); $('seed-show').value=SEED;};
 document.querySelectorAll('#seg-pos button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#seg-pos button').forEach(x=>x.classList.remove('on'));
   b.classList.add('on'); selPos=b.dataset.v;
+  if(autoSeed){ SEED=genSeed(selPos); $('seed-show').value=SEED; }
 });
 $('btn-start').onclick=()=>{
   const nm=$('in-name').value.trim()||'黃鎖頭';
